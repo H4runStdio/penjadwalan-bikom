@@ -15,51 +15,27 @@ from openpyxl.styles import PatternFill, Alignment, Border, Side
 import io
 
 st.set_page_config(page_title="Penjadwalan Bimbingan Otomatis", layout="wide")
-
 st.title("📅 Sistem Penjadwalan Bimbingan Komunal Otomatis")
 
 # ==========================
-# PARAMETER UTAMA (INPUT UI)
+# PARAMETER
 # ==========================
 st.sidebar.header("⚙️ Parameter Penjadwalan")
 
-DURASI_PER_TIM = st.sidebar.number_input(
-    "Durasi per Tim (menit)",
-    min_value=10,
-    max_value=120,
-    value=20,
-    step=5
-)
-
-MAKS_TIM_PER_DOSEN_PER_SESI = st.sidebar.number_input(
-    "Maks Tim per Dosen per Sesi",
-    min_value=1,
-    max_value=30,
-    value=12
-)
-
-MAX_TABLE_PER_ROW = st.sidebar.number_input(
-    "Jumlah Tabel per Baris",
-    min_value=1,
-    max_value=10,
-    value=6
-)
+DURASI_PER_TIM = st.sidebar.number_input("Durasi per Tim (menit)", 10, 120, 20, 5)
+MAKS_TIM_PER_DOSEN_PER_SESI = st.sidebar.number_input("Maks Tim per Dosen per Sesi", 1, 30, 12)
+MAX_TABLE_PER_ROW = st.sidebar.number_input("Jumlah Tabel per Baris", 1, 10, 6)
 
 OUTPUT_FILE = "jadwal_bikom.xlsx"
 
-# ==========================
-# HARI BIMBINGAN
-# ==========================
 HARI_BIMBINGAN = {
     "Selasa": "Jam Kesediaan pada Selasa, 21 Januari 2025",
     "Rabu": "Jam Kesediaan pada Rabu, 22 Januari 2025",
 }
 
 # ==========================
-# UPLOAD FILE
+# UPLOAD
 # ==========================
-st.header("📂 Upload Data")
-
 file_tim = st.file_uploader("Upload File Excel Data Tim", type=["xlsx"])
 file_dosen = st.file_uploader("Upload File Excel Data Dosen", type=["xlsx"])
 
@@ -68,8 +44,6 @@ if file_tim and file_dosen:
     df_dosen = pd.read_excel(file_dosen)
 
     st.success("File berhasil dibaca")
-    st.write("Jumlah Tim:", len(df_tim))
-    st.write("Jumlah Dosen:", len(df_dosen))
 
     # ==========================
     # FUNGSI JAM
@@ -78,29 +52,19 @@ if file_tim and file_dosen:
         slot = []
         start = datetime.strptime(jam_mulai, "%H.%M")
         end = datetime.strptime(jam_selesai, "%H.%M")
-
         while start + timedelta(minutes=durasi) <= end:
-            slot.append(
-                f"{start.strftime('%H:%M')}-{(start + timedelta(minutes=durasi)).strftime('%H:%M')}"
-            )
+            slot.append(f"{start.strftime('%H:%M')}-{(start + timedelta(minutes=durasi)).strftime('%H:%M')}")
             start += timedelta(minutes=durasi)
         return slot
 
-
     def parse_jam_per_sesi(jam_text):
-        if pd.isna(jam_text):
+        if pd.isna(jam_text) or str(jam_text).strip() == "Tidak Bersedia":
             return []
-
-        jam_text = str(jam_text).strip()
-        if jam_text == "Tidak Bersedia":
-            return []
-
         sesi_list = []
-        for bagian in jam_text.split(","):
+        for bagian in str(jam_text).split(","):
             bagian = bagian.strip().replace("–", "-").replace("—", "-")
             if " - " not in bagian:
                 continue
-
             mulai, selesai = bagian.split(" - ")
             sesi_list.append({
                 "range": f"{mulai} - {selesai}",
@@ -108,250 +72,194 @@ if file_tim and file_dosen:
             })
         return sesi_list
 
-
     def jam_mulai_sesi(sesi_range):
-        mulai = sesi_range.split(" - ")[0]
-        return datetime.strptime(mulai, "%H.%M")
-
+        return datetime.strptime(sesi_range.split(" - ")[0], "%H.%M")
 
     def hitung_sisa_jam(sesi_range, slot_terpakai):
         mulai, selesai = sesi_range.split(" - ")
         selesai_dt = datetime.strptime(selesai, "%H.%M")
-
         if not slot_terpakai:
             return sesi_range
-
         last_end = slot_terpakai[-1].split("-")[1]
         last_end_dt = datetime.strptime(last_end, "%H:%M")
-
         if last_end_dt >= selesai_dt:
             return None
-
         return f"{last_end_dt.strftime('%H:%M')} - {selesai}"
 
-    # ==========================
-    # TOMBOL PROSES
-    # ==========================
     if st.button("🚀 Proses Penjadwalan"):
-        with st.spinner("Sedang memproses jadwal..."):
-
-            # ==========================
-            # PROSES DATA DOSEN
-            # ==========================
-            slot_dosen = {}
-
-            for _, row in df_dosen.iterrows():
-                nama = row["Nama Lengkap"]
-                bidang = [b.strip() for b in row["Bidang PKM"].split(",")]
-                lokasi = row["Lokasi"]
-
-                slot_dosen[nama] = {
-                    "bidang": bidang,
-                    "lokasi": lokasi,
-                    "jadwal": {}
+        # ==========================
+        # PROSES DOSEN
+        # ==========================
+        slot_dosen = {}
+        for _, row in df_dosen.iterrows():
+            slot_dosen[row["Nama Lengkap"]] = {
+                "bidang": [b.strip() for b in row["Bidang PKM"].split(",")],
+                "lokasi": row["Lokasi"],
+                "jadwal": {
+                    hari: parse_jam_per_sesi(row[kol])
+                    for hari, kol in HARI_BIMBINGAN.items()
+                    if kol in row and parse_jam_per_sesi(row[kol])
                 }
+            }
 
-                for hari, kolom in HARI_BIMBINGAN.items():
-                    if kolom not in row:
-                        continue
+        # ==========================
+        # PENJADWALAN
+        # ==========================
+        hasil = []
+        jumlah_tim_dosen = {}
 
-                    sesi = parse_jam_per_sesi(row[kolom])
-                    if sesi:
-                        slot_dosen[nama]["jadwal"][hari] = sesi
-
-            # ==========================
-            # PENJADWALAN TIM
-            # ==========================
-            hasil = []
-            jumlah_tim_dosen = {}
-
-            for _, tim in df_tim.iterrows():
-                ketua = tim["Nama Ketua"]
-                nrp = tim["NRP"]
-                bidang_tim = tim["Bidang PKM"]
-                assigned = False
-
-                for dosen, data in slot_dosen.items():
-                    if assigned or bidang_tim not in data["bidang"]:
-                        continue
-
-                    jumlah_tim_dosen.setdefault(dosen, {})
-
-                    for hari, sesi_list in data["jadwal"].items():
-                        jumlah_tim_dosen[dosen].setdefault(hari, {})
-
-                        for sesi in sesi_list:
-                            sesi_range = sesi["range"]
-                            jumlah_tim_dosen[dosen][hari].setdefault(sesi_range, 0)
-
-                            if jumlah_tim_dosen[dosen][hari][sesi_range] >= MAKS_TIM_PER_DOSEN_PER_SESI:
-                                continue
-
-                            if sesi["slots"]:
-                                jam = sesi["slots"].pop(0)
-
-                                hasil.append({
-                                    "Dosen": dosen,
-                                    "Hari": hari,
-                                    "Sesi": sesi_range,
-                                    "Jam": jam,
-                                    "Ketua": ketua,
-                                    "NRP": nrp,
-                                    "Bidang": bidang_tim,
-                                    "Lokasi": data["lokasi"]
-                                })
-
-                                jumlah_tim_dosen[dosen][hari][sesi_range] += 1
-                                assigned = True
-                                break
-                        if assigned:
+        for _, tim in df_tim.iterrows():
+            assigned = False
+            for dosen, data in slot_dosen.items():
+                if assigned or tim["Bidang PKM"] not in data["bidang"]:
+                    continue
+                jumlah_tim_dosen.setdefault(dosen, {})
+                for hari, sesi_list in data["jadwal"].items():
+                    jumlah_tim_dosen[dosen].setdefault(hari, {})
+                    for sesi in sesi_list:
+                        sesi_range = sesi["range"]
+                        jumlah_tim_dosen[dosen][hari].setdefault(sesi_range, 0)
+                        if jumlah_tim_dosen[dosen][hari][sesi_range] >= MAKS_TIM_PER_DOSEN_PER_SESI:
+                            continue
+                        if sesi["slots"]:
+                            hasil.append({
+                                "Dosen": dosen,
+                                "Hari": hari,
+                                "Sesi": sesi_range,
+                                "Jam": sesi["slots"].pop(0),
+                                "Ketua": tim["Nama Ketua"],
+                                "NRP": tim["NRP"],
+                                "Bidang": tim["Bidang PKM"],
+                                "Lokasi": data["lokasi"]
+                            })
+                            jumlah_tim_dosen[dosen][hari][sesi_range] += 1
+                            assigned = True
                             break
+                    if assigned:
+                        break
 
-            # ==========================
-            # SETUP EXCEL
-            # ==========================
-            wb = Workbook()
-            del wb["Sheet"]
+        # ==========================
+        # EXCEL OUTPUT IDENTIK
+        # ==========================
+        wb = Workbook()
+        del wb["Sheet"]
 
-            center = Alignment(horizontal="center", vertical="center")
-            border = Border(
-                left=Side(style="thin"),
-                right=Side(style="thin"),
-                top=Side(style="thin"),
-                bottom=Side(style="thin")
-            )
+        center = Alignment(horizontal="center", vertical="center")
+        border = Border(*(Side(style="thin"),) * 4)
 
-            fill_dosen = PatternFill("solid", fgColor="3d85c6")
-            fill_hari = PatternFill("solid", fgColor="9fc5e8")
-            fill_lokasi = PatternFill("solid", fgColor="fff2cc")
+        fill_dosen = PatternFill("solid", fgColor="3d85c6")
+        fill_hari = PatternFill("solid", fgColor="9fc5e8")
+        fill_lokasi = PatternFill("solid", fgColor="fff2cc")
 
-            TABLE_WIDTH = 6
-            HEADER_HEIGHT = 4
-            MAX_BARIS = MAKS_TIM_PER_DOSEN_PER_SESI
-            TABLE_HEIGHT = HEADER_HEIGHT + MAX_BARIS
+        TABLE_WIDTH = 6
+        HEADER_HEIGHT = 4
+        MAX_BARIS = MAKS_TIM_PER_DOSEN_PER_SESI
+        TABLE_HEIGHT = HEADER_HEIGHT + MAX_BARIS
 
-            grouped = {}
-            for h in hasil:
-                grouped.setdefault(h["Hari"], {})
-                grouped[h["Hari"]].setdefault(h["Dosen"], {})
-                grouped[h["Hari"]][h["Dosen"]].setdefault(h["Sesi"], [])
-                grouped[h["Hari"]][h["Dosen"]][h["Sesi"]].append(h)
+        grouped = {}
+        for h in hasil:
+            grouped.setdefault(h["Hari"], {}).setdefault(h["Dosen"], {}).setdefault(h["Sesi"], []).append(h)
 
-            for hari in sorted(grouped.keys()):
-                ws = wb.create_sheet(hari)
-                table_idx = 0
+        for hari in sorted(grouped):
+            ws = wb.create_sheet(hari)
+            table_idx = 0
+            daftar = [(s, d, i) for d, sd in grouped[hari].items() for s, i in sd.items()]
+            daftar.sort(key=lambda x: jam_mulai_sesi(x[0]))
 
-                daftar_tabel = []
-                for dosen, sesi_data in grouped[hari].items():
-                    for sesi_range, items in sesi_data.items():
-                        daftar_tabel.append((sesi_range, dosen, items))
+            for sesi, dosen, items in daftar:
+                sc = 1 + (table_idx % MAX_TABLE_PER_ROW) * TABLE_WIDTH
+                sr = 1 + (table_idx // MAX_TABLE_PER_ROW) * (TABLE_HEIGHT + 1)
 
-                daftar_tabel.sort(key=lambda x: jam_mulai_sesi(x[0]))
+                ws.merge_cells(sr, sc, sr, sc+4)
+                ws.cell(sr, sc, dosen).fill = fill_dosen
+                ws.cell(sr, sc).alignment = center
 
-                for sesi_range, dosen, items in daftar_tabel:
-                    start_col = 1 + (table_idx % MAX_TABLE_PER_ROW) * TABLE_WIDTH
-                    start_row = 1 + (table_idx // MAX_TABLE_PER_ROW) * (TABLE_HEIGHT + 1)
+                ws.merge_cells(sr+1, sc, sr+1, sc+4)
+                ws.cell(sr+1, sc, f"{hari}, {sesi}").fill = fill_hari
+                ws.cell(sr+1, sc).alignment = center
 
-                    ws.merge_cells(start_row=start_row, start_column=start_col,
-                                   end_row=start_row, end_column=start_col+4)
-                    ws.cell(start_row, start_col, dosen).fill = fill_dosen
-                    ws.cell(start_row, start_col).alignment = center
+                ws.merge_cells(sr+2, sc, sr+2, sc+4)
+                ws.cell(sr+2, sc, items[0]["Lokasi"]).fill = fill_lokasi
+                ws.cell(sr+2, sc).alignment = center
 
-                    ws.merge_cells(start_row=start_row+1, start_column=start_col,
-                                   end_row=start_row+1, end_column=start_col+4)
-                    ws.cell(start_row+1, start_col, f"{hari}, {sesi_range}").fill = fill_hari
-                    ws.cell(start_row+1, start_col).alignment = center
+                headers = ["No", "KSN", "Jam", "Nama Ketua", "Bidang"]
+                for i, h in enumerate(headers):
+                    ws.cell(sr+3, sc+i, h).alignment = center
 
-                    ws.merge_cells(start_row=start_row+2, start_column=start_col,
-                                   end_row=start_row+2, end_column=start_col+4)
-                    ws.cell(start_row+2, start_col, items[0]["Lokasi"]).fill = fill_lokasi
-                    ws.cell(start_row+2, start_col).alignment = center
+                ws.merge_cells(sr+4, sc+1, sr+4+MAX_BARIS-1, sc+1)
 
-                    headers = ["No", "KSN", "Jam", "Nama Ketua", "Bidang"]
-                    for i, h in enumerate(headers):
-                        ws.cell(start_row+3, start_col+i, h).alignment = center
+                for i in range(MAX_BARIS):
+                    r = sr+4+i
+                    ws.cell(r, sc, i+1)
+                    if i < len(items):
+                        ws.cell(r, sc+2, items[i]["Jam"])
+                        ws.cell(r, sc+3, items[i]["Ketua"])
+                        ws.cell(r, sc+4, items[i]["Bidang"])
 
-                    for i in range(MAX_BARIS):
-                        r = start_row + 4 + i
-                        ws.cell(r, start_col, i+1)
-                        if i < len(items):
-                            ws.cell(r, start_col+2, items[i]["Jam"])
-                            ws.cell(r, start_col+3, items[i]["Ketua"])
-                            ws.cell(r, start_col+4, items[i]["Bidang"])
+                for r in range(sr, sr+4+MAX_BARIS):
+                    for c in range(sc, sc+5):
+                        ws.cell(r, c).border = border
 
-                    for r in range(start_row, start_row + 4 + MAX_BARIS):
-                        for c in range(start_col, start_col + 5):
-                            ws.cell(r, c).border = border
+                table_idx += 1
 
-                    table_idx += 1
+        # ==========================
+        # SHEET TAMBAHAN
+        # ==========================
+        ws_tim = wb.create_sheet("Tim Belum Terplot")
+        ws_tim.append(["NRP", "Nama Ketua", "Bidang PKM"])
+        terplot = {h["NRP"] for h in hasil}
+        for _, r in df_tim.iterrows():
+            if r["NRP"] not in terplot:
+                ws_tim.append([r["NRP"], r["Nama Ketua"], r["Bidang PKM"]])
 
-            # ==========================
-            # SHEET REKAP
-            # ==========================
-            ws_rekap = wb.create_sheet("Rekap")
+        ws_dosen = wb.create_sheet("Dosen Belum Terplot")
+        ws_dosen.append(["Nama Dosen", "Hari", "Sesi Jam", "Jam Tidak Terplot", "Lokasi"])
+        for d, data in slot_dosen.items():
+            for h, sesi_list in data["jadwal"].items():
+                for s in sesi_list:
+                    slot = [x["Jam"] for x in hasil if x["Dosen"] == d and x["Hari"] == h and x["Sesi"] == s["range"]]
+                    sisa = hitung_sisa_jam(s["range"], slot)
+                    if sisa:
+                        ws_dosen.append([d, h, s["range"], sisa, data["lokasi"]])
 
-            center = Alignment(horizontal="center", vertical="center")
+        # ==========================
+        # REKAP
+        # ==========================
+        ws_rekap = wb.create_sheet("Rekap")
+        ws_rekap.append(["REKAP JADWAL BIMBINGAN KOMUNAL"])
+        ws_rekap.merge_cells(1,1,1,6)
+        ws_rekap.cell(1,1).alignment = center
 
-            ws_rekap.append(["REKAP JADWAL BIMBINGAN KOMUNAL"])
-            ws_rekap.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
-            ws_rekap.cell(1, 1).alignment = center
+        df_hasil = pd.DataFrame(hasil)
 
-            df_hasil = pd.DataFrame(hasil)
+        ws_rekap.append([])
+        ws_rekap.append(["Jumlah Tim per Hari per Bidang PKM"])
+        pivot = pd.pivot_table(df_hasil, index="Hari", columns="Bidang", values="Ketua", aggfunc="count", fill_value=0)
+        ws_rekap.append(["Hari"] + list(pivot.columns))
+        for h, v in pivot.iterrows():
+            ws_rekap.append([h] + list(v))
 
-            # --- Jumlah Tim per Hari per Bidang PKM
-            ws_rekap.append([])
-            ws_rekap.append(["Jumlah Tim per Hari per Bidang PKM"])
+        ws_rekap.append([])
+        ws_rekap.append(["Jumlah Tim per Hari"])
+        ws_rekap.append(["Hari", "Jumlah Tim"])
+        for h, c in df_hasil.groupby("Hari")["Ketua"].count().items():
+            ws_rekap.append([h, c])
 
-            pivot = pd.pivot_table(
-                df_hasil,
-                index="Hari",
-                columns="Bidang",
-                values="Ketua",
-                aggfunc="count",
-                fill_value=0
-            )
+        ws_rekap.append([])
+        ws_rekap.append(["Jumlah Dosen per Hari"])
+        ws_rekap.append(["Hari", "Jumlah Dosen"])
+        for h, c in df_hasil.groupby("Hari")["Dosen"].nunique().items():
+            ws_rekap.append([h, c])
 
-            ws_rekap.append(["Hari"] + list(pivot.columns))
-            for hari, values in pivot.iterrows():
-                ws_rekap.append([hari] + list(values))
+        ws_rekap.append([])
+        ws_rekap.append(["Jumlah Tim per Dosen"])
+        ws_rekap.append(["Nama Dosen", "Jumlah Tim"])
+        for d, c in df_hasil.groupby("Dosen")["Ketua"].count().items():
+            ws_rekap.append([d, c])
 
-            # --- Jumlah Tim per Hari
-            ws_rekap.append([])
-            ws_rekap.append(["Jumlah Tim per Hari"])
-            ws_rekap.append(["Hari", "Jumlah Tim"])
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
 
-            for hari, count in df_hasil.groupby("Hari")["Ketua"].count().items():
-                ws_rekap.append([hari, count])
-
-            # --- Jumlah Dosen per Hari
-            ws_rekap.append([])
-            ws_rekap.append(["Jumlah Dosen per Hari"])
-            ws_rekap.append(["Hari", "Jumlah Dosen"])
-
-            for hari, count in df_hasil.groupby("Hari")["Dosen"].nunique().items():
-                ws_rekap.append([hari, count])
-
-            # --- Jumlah Tim per Dosen
-            ws_rekap.append([])
-            ws_rekap.append(["Jumlah Tim per Dosen"])
-            ws_rekap.append(["Nama Dosen", "Jumlah Tim"])
-
-            for dosen, count in df_hasil.groupby("Dosen")["Ketua"].count().items():
-                ws_rekap.append([dosen, count])
-
-
-            # ==========================
-            # DOWNLOAD
-            # ==========================
-            buffer = io.BytesIO()
-            wb.save(buffer)
-            buffer.seek(0)
-
-        st.success("Penjadwalan selesai")
-
-        st.download_button(
-            label="⬇️ Download Jadwal Excel",
-            data=buffer,
-            file_name=OUTPUT_FILE,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        st.download_button("⬇️ Download Jadwal Excel", buffer, OUTPUT_FILE)
+        st.success("Penjadwalan selesai dan output identik dengan kode Python pertama")
