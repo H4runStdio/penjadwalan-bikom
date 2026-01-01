@@ -170,15 +170,30 @@ if file_tim and file_dosen:
                 sc = 1 + (table_idx % MAX_TABLE_PER_ROW) * TABLE_WIDTH
                 sr = 1 + (table_idx // MAX_TABLE_PER_ROW) * (TABLE_HEIGHT + 1)
 
-                ws.merge_cells(sr, sc, sr, sc+4)
+                ws.merge_cells(
+                    start_row=sr,
+                    start_column=sc,
+                    end_row=sr,
+                    end_column=sc+4
+                )
                 ws.cell(sr, sc, dosen).fill = fill_dosen
                 ws.cell(sr, sc).alignment = center
 
-                ws.merge_cells(sr+1, sc, sr+1, sc+4)
+                ws.merge_cells(
+                    start_row=sr+1,
+                    start_column=sc,
+                    end_row=sr+1,
+                    end_column=sc+4
+                )
                 ws.cell(sr+1, sc, f"{hari}, {sesi}").fill = fill_hari
                 ws.cell(sr+1, sc).alignment = center
 
-                ws.merge_cells(sr+2, sc, sr+2, sc+4)
+                ws.merge_cells(
+                    start_row=sr+2,
+                    start_column=sc,
+                    end_row=sr+2,
+                    end_column=sc+4
+                )
                 ws.cell(sr+2, sc, items[0]["Lokasi"]).fill = fill_lokasi
                 ws.cell(sr+2, sc).alignment = center
 
@@ -186,7 +201,12 @@ if file_tim and file_dosen:
                 for i, h in enumerate(headers):
                     ws.cell(sr+3, sc+i, h).alignment = center
 
-                ws.merge_cells(sr+4, sc+1, sr+4+MAX_BARIS-1, sc+1)
+                ws.merge_cells(
+                    start_row=sr+4,
+                    start_column=sc+1,
+                    end_row=sr+4+MAX_BARIS-1,
+                    end_column=sc+1
+                )
 
                 for i in range(MAX_BARIS):
                     r = sr+4+i
