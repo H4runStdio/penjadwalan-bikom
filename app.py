@@ -22,7 +22,7 @@ st.title("📅 Sistem Penjadwalan Bimbingan Komunal Otomatis")
 # ==========================
 st.sidebar.header("⚙️ Parameter Penjadwalan")
 
-DURASI_PER_TIM = st.sidebar.number_input("Durasi per Tim (menit)", 10, 120, 20, 5)
+DURASI_PER_TIM = st.sidebar.number_input("Durasi per Tim (menit)", 10, 120, 20)
 MAKS_TIM_PER_DOSEN_PER_SESI = st.sidebar.number_input("Maks Tim per Dosen per Sesi", 1, 30, 12)
 MAX_TABLE_PER_ROW = st.sidebar.number_input("Jumlah Tabel per Baris", 1, 10, 6)
 
@@ -315,4 +315,4 @@ if file_tim and file_dosen:
         buffer.seek(0)
 
         st.download_button("⬇️ Download Jadwal Excel", buffer, OUTPUT_FILE)
-        st.success("Penjadwalan selesai dan output identik dengan kode Python pertama")
+        st.success("Penjadwalan selesai")
