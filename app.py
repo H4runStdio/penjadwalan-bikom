@@ -318,4 +318,4 @@ if file_tim and file_dosen:
         st.success("Penjadwalan selesai")
 
 st.divider()
-st.caption("© 2026 | Author: Haruna Lufni")
+st.caption("© 2025 | Author: Haruna Lufni")
