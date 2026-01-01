@@ -247,7 +247,12 @@ if file_tim and file_dosen:
         # ==========================
         ws_rekap = wb.create_sheet("Rekap")
         ws_rekap.append(["REKAP JADWAL BIMBINGAN KOMUNAL"])
-        ws_rekap.merge_cells(1,1,1,6)
+        ws_rekap.merge_cells(
+            start_row=1,
+            start_column=1,
+            end_row=1,
+            end_column=6
+        )
         ws_rekap.cell(1,1).alignment = center
 
         df_hasil = pd.DataFrame(hasil)
