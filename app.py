@@ -26,12 +26,40 @@ DURASI_PER_TIM = st.sidebar.number_input("Durasi per Tim (menit)", 10, 120, 20, 
 MAKS_TIM_PER_DOSEN_PER_SESI = st.sidebar.number_input("Maks Tim per Dosen per Sesi", 1, 30, 12)
 MAX_TABLE_PER_ROW = st.sidebar.number_input("Jumlah Tabel per Baris", 1, 10, 6)
 
-OUTPUT_FILE = "jadwal_bikom.xlsx"
+OUTPUT_FILE = st.sidebar.text_input(
+    "Nama File Excel Output",
+    value="jadwal_bikom.xlsx"
+)
 
-HARI_BIMBINGAN = {
-    "Selasa": "Jam Kesediaan pada Selasa, 21 Januari 2025",
-    "Rabu": "Jam Kesediaan pada Rabu, 22 Januari 2025",
-}
+JUMLAH_HARI = st.sidebar.number_input(
+    "Jumlah Hari Bimbingan",
+    min_value=1,
+    max_value=14,
+    value=2,
+    step=1
+)
+
+st.sidebar.markdown("### 🗓️ Definisi Hari Bimbingan")
+
+HARI_BIMBINGAN = {}
+
+for i in range(JUMLAH_HARI):
+    col1, col2 = st.sidebar.columns(2)
+
+    with col1:
+        nama_hari = st.text_input(
+            f"Nama Hari ke-{i+1}",
+            key=f"hari_{i}"
+        )
+
+    with col2:
+        nama_kolom = st.text_input(
+            f"Nama Kolom Excel ke-{i+1}",
+            key=f"kolom_{i}"
+        )
+
+    if nama_hari and nama_kolom:
+        HARI_BIMBINGAN[nama_hari] = nama_kolom
 
 # ==========================
 # UPLOAD
