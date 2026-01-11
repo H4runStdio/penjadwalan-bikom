@@ -123,12 +123,16 @@ if file_tim and file_dosen:
             slot_dosen[row["Nama Lengkap"]] = {
                 "bidang": [b.strip() for b in row["Bidang PKM"].split(",")],
                 "lokasi": row["Lokasi"],
-                "jadwal": {
-                    hari: parse_jam_per_sesi(row[kol])
-                    for hari, kol in HARI_BIMBINGAN.items()
-                    if kol in row and parse_jam_per_sesi(row[kol])
-                }
+                "jadwal": {}
             }
+            
+            for hari, kol in HARI_BIMBINGAN.items():
+                if kol not in row:
+                    continue
+            
+                sesi = parse_jam_per_sesi(row[kol])
+                if sesi:
+                    slot_dosen[row["Nama Lengkap"]]["jadwal"][hari] = sesi
 
         # ==========================
         # PENJADWALAN
