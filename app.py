@@ -15,7 +15,7 @@ from openpyxl.styles import PatternFill, Alignment, Border, Side
 import io
 
 st.set_page_config(page_title="Penjadwalan Bimbingan Otomatis", layout="wide")
-st.title("📅 Sistem Penjadwalan Bimbingan Komunal Otomatis")
+st.title("📅 Sistem Penjadwalan Bimbingan Komunal")
 
 # PARAMETER
 st.sidebar.header("⚙️ Parameter Penjadwalan")
@@ -37,7 +37,7 @@ JUMLAH_HARI = st.sidebar.number_input(
     step=1
 )
 
-st.sidebar.markdown("### 🗓️ Definisi Hari Bimbingan")
+st.sidebar.markdown("### 🗓️ Kolom Hari Bimbingan")
 
 HARI_BIMBINGAN = {}
 
@@ -52,7 +52,7 @@ for i in range(JUMLAH_HARI):
 
     with col2:
         nama_kolom = st.text_input(
-            f"Nama Kolom Excel ke-{i+1}",
+            f"Nama Kolom Excel Hari ke-{i+1}",
             key=f"kolom_{i}"
         )
 
@@ -162,7 +162,6 @@ if file_tim and file_dosen:
                     if assigned:
                         break
 
-        
         # OUTPUT EXCEL
         # Jadwal
         wb = Workbook()
