@@ -17,9 +17,7 @@ import io
 st.set_page_config(page_title="Penjadwalan Bimbingan Otomatis", layout="wide")
 st.title("📅 Sistem Penjadwalan Bimbingan Komunal Otomatis")
 
-# ==========================
 # PARAMETER
-# ==========================
 st.sidebar.header("⚙️ Parameter Penjadwalan")
 
 DURASI_PER_TIM = st.sidebar.number_input("Durasi per Tim (menit)", 10, 120, 20)
@@ -61,9 +59,7 @@ for i in range(JUMLAH_HARI):
     if nama_hari and nama_kolom:
         HARI_BIMBINGAN[nama_hari] = nama_kolom
 
-# ==========================
 # UPLOAD
-# ==========================
 file_tim = st.file_uploader("Upload File Excel Data Tim", type=["xlsx"])
 file_dosen = st.file_uploader("Upload File Excel Data Dosen", type=["xlsx"])
 
@@ -73,9 +69,7 @@ if file_tim and file_dosen:
 
     st.success("File berhasil dibaca")
 
-    # ==========================
     # FUNGSI JAM
-    # ==========================
     def buat_slot(jam_mulai, jam_selesai, durasi):
         slot = []
         start = datetime.strptime(jam_mulai, "%H.%M")
@@ -115,9 +109,8 @@ if file_tim and file_dosen:
         return f"{last_end_dt.strftime('%H:%M')} - {selesai}"
 
     if st.button("🚀 Proses Penjadwalan"):
-        # ==========================
+        
         # PROSES DOSEN
-        # ==========================
         slot_dosen = {}
         for _, row in df_dosen.iterrows():
             slot_dosen[row["Nama Lengkap"]] = {
@@ -134,9 +127,8 @@ if file_tim and file_dosen:
                 if sesi:
                     slot_dosen[row["Nama Lengkap"]]["jadwal"][hari] = sesi
 
-        # ==========================
+        
         # PENJADWALAN
-        # ==========================
         hasil = []
         jumlah_tim_dosen = {}
 
@@ -170,9 +162,9 @@ if file_tim and file_dosen:
                     if assigned:
                         break
 
-        # ==========================
-        # EXCEL OUTPUT IDENTIK
-        # ==========================
+        
+        # OUTPUT EXCEL
+        # Jadwal
         wb = Workbook()
         del wb["Sheet"]
 
@@ -254,9 +246,7 @@ if file_tim and file_dosen:
 
                 table_idx += 1
 
-        # ==========================
-        # SHEET TAMBAHAN
-        # ==========================
+        # Belum Terplot
         ws_tim = wb.create_sheet("Tim Belum Terplot")
         ws_tim.append(["NRP", "Nama Ketua", "Bidang PKM"])
         terplot = {h["NRP"] for h in hasil}
@@ -274,9 +264,7 @@ if file_tim and file_dosen:
                     if sisa:
                         ws_dosen.append([d, h, s["range"], sisa, data["lokasi"]])
 
-        # ==========================
-        # REKAP
-        # ==========================
+        # Rekap
         ws_rekap = wb.create_sheet("Rekap")
         ws_rekap.append(["REKAP JADWAL BIMBINGAN KOMUNAL"])
         ws_rekap.merge_cells(
